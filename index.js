@@ -1,5 +1,6 @@
 const express = require("express");
 const Mikrotik = require("splynx-mikronode-ng2"); // Import the new library
+const cors = require('cors');
 const app = express();
 
 const { Connection } = Mikrotik;
@@ -10,7 +11,17 @@ const mikrotik = new Connection({
   user: "admin",
   password: "admin-password",
 });
+// Define CORS options
+const corsOptions = {
+    origin: 'https://hotspot-login.vercel.app', // Frontend URL
+    methods: ['GET', 'POST'], // Allowed methods
+    allowedHeaders: ['Content-Type'], // Allowed headers
+  };
+  
+  // Enable CORS with the specified options
+  app.use(cors(corsOptions));
 
+  
 app.use(express.json());
 
 app.post("/login", (req, res) => {
