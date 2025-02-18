@@ -1,66 +1,94 @@
 const express = require("express");
-const Mikrotik = require("splynx-mikronode-ng2"); // Import the new library
-const cors = require('cors');
+const MikroNode = require("mikronode-ng"); // Import mikronode-ng
+const cors = require("cors");
+
 const app = express();
 
-const { Connection } = Mikrotik;
+// MikroTik API connection details
+const host = "your-mikrotik-router-ip"; // Replace with MikroTik IP
+const user = "admin"; // MikroTik username
+const password = "admin-password"; // MikroTik password
 
-// MikroTik API configuration
-const mikrotik = new Connection({
-  host: "your-mikrotik-router-ip",
-  user: "admin",
-  password: "admin-password",
-});
+console.log("🔥 MikroTik API configuration initialized");
 
-console.log("MikroTik API configuration initialized");
-
-// Define CORS options
 const corsOptions = {
-  origin: 'https://hotspot-login.vercel.app', // Frontend URL
-  methods: ['GET', 'POST'], // Allowed methods
-  allowedHeaders: ['Content-Type'], // Allowed headers
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      "https://hotspot-login.vercel.app", // Deployed frontend URL
+      "http://localhost:3000", // Local development URL
+    ];
+
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"],
 };
 
 // Enable CORS with the specified options
 app.use(cors(corsOptions));
-console.log("CORS enabled with allowed origin:", corsOptions.origin);
+console.log("✅ CORS enabled with allowed origins");
 
 app.use(express.json());
 
-app.post("/", (req, res) => {
+app.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
-  console.log("Login request received with username:", username);
+  console.log("📥 Received login request with username:", username);
+  let connection;
 
-  mikrotik
-    .connect()
-    .then(() => {
-      console.log("Connected to MikroTik router successfully");
+  try {
+    console.log("🔌 Attempting to connect to MikroTik...");
+    connection = await MikroNode.getConnection(host, user, password);
+    console.log("✅ Connected to MikroTik router successfully");
 
-      // Send authentication request to MikroTik Hotspot
-      console.log("Sending authentication request to MikroTik Hotspot...");
-      return mikrotik.write("/ip/hotspot/login", {
-        user: username,
-        password: password,
-      });
-    })
-    .then(response => {
-      console.log("Response received from MikroTik:", response);
-      
-      if (response && response[0] && response[0].status === "success") {
-        console.log("Login successful for user:", username);
+    const channel = connection.openChannel("hotspotLogin");
+    console.log("📡 Opened channel for hotspot authentication");
+
+    // Query hotspot users to verify login
+    console.log("🛜 Sending request to check user authentication...");
+    channel.write("/ip/hotspot/user/print");
+
+    channel.on("done", (data) => {
+      console.log("🔍 Response received from MikroTik:", data.data);
+
+      const userExists = data.data.some((user) => user.name === username);
+
+      if (userExists) {
+        console.log("✅ Login successful for user:", username);
         res.status(200).send("Login successful");
       } else {
-        console.log("Invalid credentials for user:", username);
+        console.log("❌ Invalid credentials for user:", username);
         res.status(401).send("Invalid credentials");
       }
-    })
-    .catch(err => {
-      console.error("Error occurred while connecting to MikroTik or during authentication:", err);
-      res.status(500).send("MikroTik connection failed");
+
+      console.log("🛑 Closing channel and connection...");
+      channel.close();
+      if (connection) connection.close();
     });
+
+    channel.on("error", (err) => {
+      console.error("⚠️ Error in MikroTik authentication request:", err);
+      res.status(500).send("MikroTik authentication failed");
+
+      console.log("🛑 Closing channel and connection due to error...");
+      channel.close();
+      if (connection) connection.close();
+    });
+  } catch (err) {
+    console.error("❌ Error occurred while connecting to MikroTik:", err);
+    res.status(500).send("MikroTik connection failed");
+
+    if (connection) {
+      console.log("🛑 Closing connection due to failure...");
+      connection.close();
+    }
+  }
 });
 
 app.listen(5000, () => {
-  console.log("Server is running on port 5000");
+  console.log("🚀 Server is running on port 5000");
 });
