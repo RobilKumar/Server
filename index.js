@@ -5,7 +5,7 @@ const cors = require("cors");
 const app = express();
 
 // MikroTik API connection details
-const host = "your-mikrotik-router-ip"; // Replace with MikroTik IP
+const host = "192.168.50.1"; // Replace with MikroTik IP
 const user = "admin"; // MikroTik username
 const password = "admin-password"; // MikroTik password
 
@@ -37,13 +37,13 @@ app.use(express.json());
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
-  console.log("📥 Received login request with username:", username);
+  console.log("📥 Received login request with username:", username,host);
   let connection;
 
   try {
     console.log("🔌 Attempting to connect to MikroTik...");
     connection = await MikroNode.getConnection(host, user, password);
-    console.log("✅ Connected to MikroTik router successfully");
+    console.log("✅ Connected to MikroTik router successfully",connection);
 
     const channel = connection.openChannel("hotspotLogin");
     console.log("📡 Opened channel for hotspot authentication");
