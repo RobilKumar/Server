@@ -27,7 +27,7 @@ console.log("CORS enabled with allowed origin:", corsOptions.origin);
 
 app.use(express.json());
 
-app.post("/login", (req, res) => {
+app.post("/", (req, res) => {
   const { username, password } = req.body;
 
   console.log("Login request received with username:", username);
